@@ -1,8 +1,6 @@
 package emulator
 
 import (
-	"fmt"
-
 	rl "github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -15,7 +13,7 @@ type Video struct {
 func (v *Video) Init(width, height int32) {
 	v.width = width
 	v.height = height
-	rl.InitWindow(v.width, v.height, "Color8 Emulator")
+	rl.InitWindow(v.width, v.height, "Chip-8 Emulator")
 	rl.SetTargetFPS(120)
 }
 
@@ -53,7 +51,6 @@ func (v *Video) Draw(bitmap []byte, x, y int32) bool {
 			// check if both sprite and memory bits are set (collision), on this case set
 			// the VF register with 1
 			if spriteBit == 1 && v.videoMemory[bitY][bitX] == 1 {
-				fmt.Println("COLLISION")
 				collision = true
 			}
 
