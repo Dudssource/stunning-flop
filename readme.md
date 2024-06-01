@@ -16,7 +16,7 @@ go run main.go -f test-roms\$ROM_NAME
 
 ## Using
 
-`Q`: Quits the emulator
+`ESC`: Quits the emulator
 
 ### Keyboard
 
