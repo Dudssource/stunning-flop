@@ -125,7 +125,7 @@ func (c *chip8) Loop() {
 		c.execute_instruction()
 
 		// emulate raylib event loop
-		c.video.Draw([]byte{}, 0, 0)
+		c.video.Draw([]byte{}, 0, 0, false)
 	}
 }
 
@@ -152,6 +152,24 @@ func (c *chip8) execute_instruction() {
 		switch opcode.Low() {
 		default:
 			c.pc -= 2
+		case 0xC0:
+		case 0xC1:
+		case 0xC2:
+		case 0xC3:
+		case 0xC4:
+		case 0xC5:
+		case 0xC6:
+		case 0xC7:
+		case 0xC8:
+		case 0xC9:
+		case 0xCA:
+		case 0xCB:
+		case 0xCC:
+		case 0xCD:
+		case 0xCE:
+		case 0xCF:
+			// 00CN - SCRD - Scroll display N lines down
+			c.scrd(opcode)
 		case 0xE0:
 			// 00E0 - CLS - Clear video screen
 			c.cls(opcode)
@@ -169,10 +187,10 @@ func (c *chip8) execute_instruction() {
 			c.scrl(opcode)
 		case 0xFE:
 			// SCHIP - 00FE - LORES - Disable high resolution
-			c.video.extended = false
+			c.video.DisableExtendedMode()
 		case 0xFF:
 			// SCHIP - 00FF - HIRES - Enable high resolution
-			c.video.extended = true
+			c.video.EnableExtendedMode()
 		}
 	case 0x10:
 		// 1nnn - JUMP - Jump to Address

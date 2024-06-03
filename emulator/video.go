@@ -20,7 +20,7 @@ func (v *Video) Init(width, height int32) {
 	v.internalHeight = 32
 	v.width = width
 	v.height = height
-	v.scaleFactor = width / v.internalWidth
+	v.scaleFactor = v.width / v.internalWidth
 
 	v.videoMemory = make([][]uint8, v.internalHeight)
 	for i := range v.videoMemory {
@@ -35,12 +35,34 @@ func (v *Video) EnableExtendedMode() {
 	v.extended = true
 	v.internalHeight = 64
 	v.internalWidth = 128
+	v.scaleFactor = v.width / v.internalWidth
+	v.Clear()
 }
 
 func (v *Video) DisableExtendedMode() {
 	v.extended = false
 	v.internalHeight = 32
 	v.internalWidth = 64
+	v.scaleFactor = v.width / v.internalWidth
+	v.Clear()
+}
+
+func (v *Video) ScrollDown(n uint8) {
+	// scroll overlapping
+	for y := v.internalHeight - int32(1+n); y >= 0; y-- {
+		for x := 0; x < int(v.internalWidth); x++ {
+			v.videoMemory[uint8(y)+n][x] = v.videoMemory[y][x]
+		}
+	}
+
+	// zeroing the first N bytes
+	for y := 0; y < int(n); y++ {
+		for x := 0; x < int(v.internalWidth); x++ {
+			v.videoMemory[y][x] = 0x0
+		}
+	}
+
+	v.Draw([]byte{}, 0, 0, false)
 }
 
 func (v *Video) ScrollLeft() {
@@ -49,19 +71,31 @@ func (v *Video) ScrollLeft() {
 			v.videoMemory[y][x-4] = v.videoMemory[y][x]
 		}
 	}
-	v.Draw([]byte{}, 0, 0)
+	// zeroing
+	for y := 0; y < int(v.internalHeight); y++ {
+		for x := v.internalWidth - 5; x < v.internalWidth; x++ {
+			v.videoMemory[y][x] = 0x0
+		}
+	}
+	v.Draw([]byte{}, 0, 0, false)
 }
 
 func (v *Video) ScrollRight() {
 	for y := 0; y < int(v.internalHeight); y++ {
-		for x := v.internalWidth - 4; x >= 0; x-- {
+		for x := v.internalWidth - 5; x >= 0; x-- {
 			v.videoMemory[y][x+4] = v.videoMemory[y][x]
 		}
 	}
-	v.Draw([]byte{}, 0, 0)
+	// zeroing
+	for y := 0; y < int(v.internalHeight); y++ {
+		for x := 0; x < 4; x++ {
+			v.videoMemory[y][x] = 0x0
+		}
+	}
+	v.Draw([]byte{}, 0, 0, false)
 }
 
-func (v *Video) Draw(bitmap []byte, x, y int32) bool {
+func (v *Video) Draw(bitmap []byte, x, y int32, rowWiseBitmap bool) bool {
 
 	var (
 		collision = false
@@ -89,7 +123,7 @@ func (v *Video) Draw(bitmap []byte, x, y int32) bool {
 			spriteBit := (sprite & (1 << bit) >> bit)
 
 			// for SCHIP extended mode
-			if v.extended {
+			if v.extended && rowWiseBitmap {
 				bitY = ((y / 2) + int32(i)) % v.internalHeight
 				if i%2 == 1 {
 					bitX = (x + 8 + (7 - bit)) % v.internalWidth
