@@ -55,6 +55,12 @@ type chip8 struct {
 
 	// Keyboard device
 	keyboard *Keyboard
+
+	// SCHIP - cpu should stop
+	stop bool
+
+	// SCHIP rpl flag registers
+	rpl []uint8
 }
 
 func Cpu() *chip8 {
@@ -114,7 +120,7 @@ func (c *chip8) Loop() {
 	c.video.Init(512, 256)
 	defer c.video.Close()
 
-	for !rl.WindowShouldClose() {
+	for !rl.WindowShouldClose() && !c.stop {
 		// execute single instruction
 		c.execute_instruction()
 
@@ -142,16 +148,6 @@ func (c *chip8) execute_instruction() {
 
 	switch opcode.High() & 0xf0 {
 
-	/*
-	* TODO:
-	* Dxyn - DRW Vx, Vy, nibble OK
-	* Ex9E - SKP Vx
-	* ExA1 - SKNP Vx
-	* Fx0A - LD Vx, K
-	* Fx33 - LD B, Vx OK
-	* Fx55 - LD [I], Vx OK
-	* Fx65 - LD Vx, [I] OK
-	 */
 	case 0x00:
 		switch opcode.Low() {
 		default:
@@ -159,9 +155,24 @@ func (c *chip8) execute_instruction() {
 		case 0xE0:
 			// 00E0 - CLS - Clear video screen
 			c.cls(opcode)
+		case 0xFD:
+			// SCHIP - 00FD - EXIT - Exit interpreter
+			c.stop = true
 		case 0xEE:
 			// 00EE - RTS - Return from Subroutine
 			c.rts()
+		case 0xFB:
+			// SCHIP - 00FB - SCRR - Scroll the display right by 4 pixels
+			c.scrr(opcode)
+		case 0xFC:
+			// SCHIP - 00FC - SCRL - Scroll the display left by 4 pixels
+			c.scrl(opcode)
+		case 0xFE:
+			// SCHIP - 00FE - LORES - Disable high resolution
+			c.video.extended = false
+		case 0xFF:
+			// SCHIP - 00FF - HIRES - Enable high resolution
+			c.video.extended = true
 		}
 	case 0x10:
 		// 1nnn - JUMP - Jump to Address
@@ -271,6 +282,12 @@ func (c *chip8) execute_instruction() {
 		case 0x65:
 			// Fs65 - READ - Read Stored Registers
 			c.read(opcode)
+		case 0x75:
+			// Fn75 - SRPL - Stores the values from n number of registers into RPL
+			c.srpl(opcode)
+		case 0x85:
+			// Fn85 - RRPL - Reads the values from n number of registers from RPL
+			c.rrpl(opcode)
 		default:
 			break
 		}

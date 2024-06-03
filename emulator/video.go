@@ -5,23 +5,63 @@ import (
 )
 
 type Video struct {
-	width       int32
-	height      int32
-	videoMemory [32][64]uint8
+	width          int32
+	height         int32
+	internalWidth  int32
+	internalHeight int32
+	videoMemory    [][]uint8
+	scaleFactor    int32
+	// SCHIP extended mode
+	extended bool
 }
 
 func (v *Video) Init(width, height int32) {
+	v.internalWidth = 64
+	v.internalHeight = 32
 	v.width = width
 	v.height = height
+	v.scaleFactor = width / v.internalWidth
+
+	v.videoMemory = make([][]uint8, v.internalHeight)
+	for i := range v.videoMemory {
+		v.videoMemory[i] = make([]uint8, v.internalWidth)
+	}
+
 	rl.InitWindow(v.width, v.height, "Chip-8 Emulator")
 	rl.SetTargetFPS(120)
 }
 
-func (v *Video) Draw(bitmap []byte, x, y int32) bool {
+func (v *Video) EnableExtendedMode() {
+	v.extended = true
+	v.internalHeight = 64
+	v.internalWidth = 128
+}
 
-	const (
-		tileSize = int32(8)
-	)
+func (v *Video) DisableExtendedMode() {
+	v.extended = false
+	v.internalHeight = 32
+	v.internalWidth = 64
+}
+
+func (v *Video) ScrollLeft() {
+	for y := 0; y < int(v.internalHeight); y++ {
+		for x := 4; x < int(v.internalWidth); x++ {
+			v.videoMemory[y][x-4] = v.videoMemory[y][x]
+		}
+	}
+	v.Draw([]byte{}, 0, 0)
+}
+
+func (v *Video) ScrollRight() {
+	for y := 0; y < int(v.internalHeight); y++ {
+		for x := v.internalWidth - 4; x >= 0; x-- {
+			v.videoMemory[y][x+4] = v.videoMemory[y][x]
+		}
+	}
+	v.Draw([]byte{}, 0, 0)
+}
+
+func (v *Video) Draw(bitmap []byte, x, y int32) bool {
 
 	var (
 		collision = false
@@ -39,14 +79,22 @@ func (v *Video) Draw(bitmap []byte, x, y int32) bool {
 
 			var (
 				// wrap pixels if they overlap the screen internal size
-				bitY = (y + int32(i)) % 32
-				bitX = (x + (7 - bit)) % 64
+				bitY = (y + int32(i)) % v.internalHeight
+				bitX = (x + (7 - bit)) % v.internalWidth
 			)
 
 			// check if the k-th bit is set, by left shifting 1 by k to create a bit mask with
 			// only k-th set, ANDing it with the number to extract the result and
 			// right shifting by k-th again to extract the bit value (0 or 1)
 			spriteBit := (sprite & (1 << bit) >> bit)
+
+			// for SCHIP extended mode
+			if v.extended {
+				bitY = ((y / 2) + int32(i)) % v.internalHeight
+				if i%2 == 1 {
+					bitX = (x + 8 + (7 - bit)) % v.internalWidth
+				}
+			}
 
 			// check if both sprite and memory bits are set (collision), on this case set
 			// the VF register with 1
@@ -61,12 +109,12 @@ func (v *Video) Draw(bitmap []byte, x, y int32) bool {
 	}
 
 	// Draw
-	for y := 0; y < 32; y++ {
-		for x := 0; x < 64; x++ {
+	for y := 0; y < int(v.internalHeight); y++ {
+		for x := 0; x < int(v.internalWidth); x++ {
 
 			var (
-				posX = int32(x) * int32(tileSize)
-				posY = int32(y) * int32(tileSize)
+				posX = int32(x) * v.scaleFactor
+				posY = int32(y) * v.scaleFactor
 			)
 
 			var color = rl.RayWhite
@@ -75,7 +123,7 @@ func (v *Video) Draw(bitmap []byte, x, y int32) bool {
 				color = rl.Black
 			}
 
-			rl.DrawRectangle(posX, posY, tileSize, tileSize, color)
+			rl.DrawRectangle(posX, posY, v.scaleFactor, v.scaleFactor, color)
 		}
 	}
 
@@ -87,7 +135,10 @@ func (v *Video) Close() {
 }
 
 func (v *Video) Clear() {
-	v.videoMemory = [32][64]uint8{}
+	v.videoMemory = make([][]uint8, v.internalHeight)
+	for i := range v.videoMemory {
+		v.videoMemory[i] = make([]uint8, v.internalWidth)
+	}
 	rl.BeginDrawing()
 	rl.ClearBackground(rl.RayWhite)
 	rl.EndDrawing()

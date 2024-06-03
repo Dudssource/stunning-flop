@@ -5,6 +5,11 @@ func (c *chip8) draw(opcode Word) {
 	vy := opcode.Low() & 0xF0 >> 4
 	n := int(opcode.Low() & 0xF)
 
+	// SCHIP 16x16 sprite instruction
+	if n == 0 && c.video.extended {
+		n = 32
+	}
+
 	if n > 0 {
 		bitmap := make([]byte, n)
 		temp := c.i
